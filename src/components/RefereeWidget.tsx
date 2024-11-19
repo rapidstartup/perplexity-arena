@@ -4,6 +4,7 @@ import { X, Bot } from 'lucide-react';
 
 interface RefereeWidgetProps {
   isOpen: boolean;
+  onOpen: () => void;
   onClose: () => void;
   loading: boolean;
   commentary?: string;
@@ -13,6 +14,7 @@ interface RefereeWidgetProps {
 
 export function RefereeWidget({
   isOpen,
+  onOpen,
   onClose,
   loading,
   commentary,
@@ -21,19 +23,19 @@ export function RefereeWidget({
 }: RefereeWidgetProps) {
   const [isWakingUp, setIsWakingUp] = useState(false);
 
-  // Trigger wake-up animation when the user submits their first message
+  // Trigger wake-up animation and make the button active immediately on submit
   useEffect(() => {
-    if (hasUserSubmitted && !hasResponses) {
+    if (hasUserSubmitted) {
       setIsWakingUp(true);
       const timeout = setTimeout(() => setIsWakingUp(false), 2000); // Wake-up animation lasts 2 seconds
       return () => clearTimeout(timeout);
     }
-  }, [hasUserSubmitted, hasResponses]);
+  }, [hasUserSubmitted]);
 
   return (
     <>
       <AnimatePresence>
-        {isOpen ? (
+        {isOpen && (
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
@@ -62,12 +64,15 @@ export function RefereeWidget({
 
               {/* Scrollable commentary section */}
               <div className="mt-6 bg-red-500 rounded-lg p-4 h-96 overflow-y-auto">
-                {loading ? (
+                {isWakingUp ? (
+                  <div className="text-center">
+                    <p className="text-sm">Waking up...</p>
+                  </div>
+                ) : loading ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></div>
                     <div className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                     <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
-                    <div><p className="text-sm whitespace-pre-wrap">..waiting on Perplexity</p></div>
                   </div>
                 ) : (
                   <p className="text-sm whitespace-pre-wrap">{commentary}</p>
@@ -75,37 +80,42 @@ export function RefereeWidget({
               </div>
             </div>
           </motion.div>
-        ) : (
-          <motion.button
-            onClick={hasResponses ? onClose : undefined}
-            initial={false}
-            animate={{
-              scale: hasResponses ? [1, 1.2, 1] : 1,
-              backgroundColor: hasResponses ? 'rgb(220, 38, 38)' : 'rgb(75, 85, 99)',
-            }}
-            transition={{
-              scale: {
-                repeat: hasResponses ? Infinity : 0,
-                repeatType: 'reverse',
-                duration: 1,
-              },
-            }}
-            className={`fixed right-8 top-1/2 -translate-y-1/2 flex items-center gap-2 px-4 py-3 text-white rounded-l-lg shadow-lg z-50 ${
-              hasResponses ? 'hover:bg-red-500' : 'cursor-not-allowed opacity-75'
-            }`}
-            whileHover={hasResponses ? { x: -5 } : undefined}
-          >
-            <Bot
-              className={`w-5 h-5 ${
-                isWakingUp ? 'animate-pulse' : hasResponses ? 'animate-bounce' : ''
-              }`}
-            />
-            <span className="text-sm font-medium">
-              {hasResponses ? 'View Referee' : 'Start your battle first!'}
-            </span>
-          </motion.button>
         )}
       </AnimatePresence>
+
+      {!isOpen && (
+        <motion.button
+          onClick={onOpen} // Ensure this explicitly calls the function to open the widget
+          initial={false}
+          animate={{
+            scale: isWakingUp || hasResponses ? [1, 1.2, 1] : 1,
+            backgroundColor: hasResponses || hasUserSubmitted
+              ? 'rgb(220, 38, 38)' // Red when active or after submit
+              : 'rgb(75, 85, 99)', // Default gray
+          }}
+          transition={{
+            scale: {
+              repeat: isWakingUp || hasResponses ? Infinity : 0,
+              repeatType: 'reverse',
+              duration: 1,
+            },
+          }}
+          className={`fixed right-8 top-1/2 -translate-y-1/2 flex items-center gap-2 px-4 py-3 text-white rounded-l-lg shadow-lg z-40 ${
+            hasUserSubmitted || hasResponses
+              ? 'hover:bg-red-500 cursor-pointer'
+              : 'cursor-not-allowed opacity-75'
+          }`}
+        >
+          <Bot
+            className={`w-5 h-5 ${
+              isWakingUp ? 'animate-pulse' : hasResponses ? 'animate-bounce' : ''
+            }`}
+          />
+          <span className="text-sm font-medium">
+            {hasResponses || hasUserSubmitted ? 'View Referee' : 'Start your battle first!'}
+          </span>
+        </motion.button>
+      )}
     </>
   );
 }

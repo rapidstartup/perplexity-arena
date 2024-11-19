@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon, Swords } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { ModelSelect } from './components/ModelSelect';
 import { ChatInput } from './components/ChatInput';
 import { ApiKeyInput } from './components/ApiKeyInput';
@@ -97,43 +97,53 @@ function App() {
     setRefereeLoading(true);
     try {
       const grokApiKey = import.meta.env.VITE_GROK_API_KEY;
-
+  
       if (!grokApiKey) {
         throw new Error('GROK_API_KEY is missing in environment variables');
       }
-
+  
+      const payload = {
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a trash talking sh*tposter that loves to make fun of llms responses. Take a look at the following 2 chats on the Perplexity Battleground arena that a user is trying to compare. Make a comment about them both and give a ruling on which gave the best response in the most humorous way possible. Keep your full response to about 10-20 lines if you can.',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({
+              response1: response1.choices[0].message.content,
+              response2: response2.choices[0].message.content,
+            }),
+          },
+        ],
+        model: 'grok-beta',
+        temperature: 1,
+      };
+  
+      console.log('Payload sent to Grok:', payload);
+  
       const response = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${grokApiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You are a trash talking sh*tposter that loves to make fun of llms responses. Take a look at the following 2 chats on the Perplexity Battleground arena that a user is trying to compare. Make a comment about them both and give a ruling on which gave the best response in the most humorous way possible. You will also see the RESPONSE TIME given, so you can comment on that too. Keep your full response to about 10-20 lines if you can.',
-            },
-            {
-              role: 'user',
-              content: JSON.stringify({
-                response1: response1.choices[0].message.content,
-                response2: response2.choices[0].message.content,
-              }),
-            },
-          ],
-          model: 'grok-beta',
-          temperature: 1,
-        }),
+        body: JSON.stringify(payload),
       });
-
+  
+      console.log('Grok API response status:', response.status);
+  
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Grok API error details:', errorData);
         throw new Error('Failed to get Grok commentary');
       }
-
+  
       const data = await response.json();
-      setRefereeCommentary(data.choices[0].message.content);
+      console.log('Grok API response data:', data);
+  
+      setRefereeCommentary(data.choices[0]?.message?.content || 'No commentary received');
     } catch (error) {
       console.error('Grok API Error:', error);
       setRefereeCommentary('The referee is taking a coffee break... 🍵');
@@ -143,77 +153,59 @@ function App() {
   };
 
   const handleSendMessage = async (content: string) => {
+    // Restrict usage after one free try without an API key
     if ((!apiKey && remainingFreeUsage <= 0) || !model1 || !model2) {
       setError('You must provide an API key after your free usage is exhausted.');
       return;
     }
-
+  
+    // Deduct free usage if using the built-in API key
+    if (!apiKey && remainingFreeUsage > 0) {
+      setRemainingFreeUsage((prev) => prev - 1);
+      localStorage.setItem('remaining_free_usage', (remainingFreeUsage - 1).toString());
+    }
+  
     setError(null);
-    setHasUserSubmitted(true); // Trigger the wake-up animation on first submission
-
+    setHasUserSubmitted(true); // Make the tab button clickable immediately on submission
+    setInputDisabled(true); // Disable ChatInput while waiting for responses
+  
     const newMessage: Message = { role: 'user', content };
-
+  
     // Show user's message instantly
     setMessages1((prevMessages) => [...prevMessages, newMessage]);
     setMessages2((prevMessages) => [...prevMessages, newMessage]);
-
-    setInputDisabled(true); // Disable ChatInput while waiting for responses
-
-    // Track the start time to calculate response times
-    const startTime = Date.now();
-
-    // Send requests independently
-    const fetchModel1 = async () => {
-      try {
-        const response = await makeRequest(model1, [...messages1, newMessage]);
-        const responseTime = Date.now() - startTime; // Calculate response time
-        setMessages1((prevMessages) => [
-          ...prevMessages,
-          {
-            role: 'assistant',
-            content: response.choices[0].message.content,
-            responseTime,
-          },
-        ]);
-      } catch (error) {
-        console.error('Error fetching response for Model 1:', error);
-        setError(error instanceof Error ? error.message : 'An unexpected error occurred');
-      }
-    };
-
-    const fetchModel2 = async () => {
-      try {
-        const response = await makeRequest(model2, [...messages2, newMessage]);
-        const responseTime = Date.now() - startTime; // Calculate response time
-        setMessages2((prevMessages) => [
-          ...prevMessages,
-          {
-            role: 'assistant',
-            content: response.choices[0].message.content,
-            responseTime,
-          },
-        ]);
-      } catch (error) {
-        console.error('Error fetching response for Model 2:', error);
-        setError(error instanceof Error ? error.message : 'An unexpected error occurred');
-      }
-    };
-
-    await Promise.all([fetchModel1(), fetchModel2()]);
-    setInputDisabled(false); // Re-enable ChatInput when responses are complete
-    setHasResponses(true); // Responses are ready
-
+  
     try {
+      // Fetch responses from both models
       const [response1, response2] = await Promise.all([
         makeRequest(model1, [...messages1, newMessage]),
         makeRequest(model2, [...messages2, newMessage]),
       ]);
+  
+      // Update the message lists with responses
+      setMessages1((prevMessages) => [
+        ...prevMessages,
+        { role: 'assistant', content: response1.choices[0].message.content },
+      ]);
+      setMessages2((prevMessages) => [
+        ...prevMessages,
+        { role: 'assistant', content: response2.choices[0].message.content },
+      ]);
+  
+      // Set responses ready state
+      setHasResponses(true);
+  
+      // Invoke Grok Commentary
       await getGrokCommentary(response1, response2);
-      setIsRefereeOpen(true);
     } catch (error) {
-      console.error('Error fetching Grok commentary:', error);
+      console.error('Error during request:', error);
+      setError('An error occurred while fetching responses.');
+    } finally {
+      setInputDisabled(false); // Re-enable ChatInput after responses
     }
   };
+  
+  
 
   return (
     <div className={darkMode ? 'dark' : ''}>
@@ -280,7 +272,8 @@ function App() {
 
         <RefereeWidget
           isOpen={isRefereeOpen}
-          onClose={() => setIsRefereeOpen(!isRefereeOpen)}
+          onOpen={() => setIsRefereeOpen(true)} // Open the widget
+          onClose={() => setIsRefereeOpen(false)} // Close the widget
           loading={refereeLoading}
           commentary={refereeCommentary}
           hasResponses={hasResponses}
