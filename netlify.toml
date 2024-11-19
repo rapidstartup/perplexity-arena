@@ -1,0 +1,6 @@
+[build]
+  secrets_scan_enabled = true # Ensure secrets scanning is enabled
+
+[secrets]
+  omit_paths = ["dist/assets/*.js"] # Ignore specific paths
+  omit_keys = ["VITE_GROK_API_KEY", "VITE_PERPLEXITY_API_KEY"] # Ignore specific keys
