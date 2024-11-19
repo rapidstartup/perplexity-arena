@@ -20,6 +20,7 @@ function App() {
   const [refereeLoading, setRefereeLoading] = useState(false);
   const [refereeCommentary, setRefereeCommentary] = useState<string>();
   const [hasResponses, setHasResponses] = useState(false);
+  const [hasUserSubmitted, setHasUserSubmitted] = useState(false); // Track first user submission
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -117,6 +118,8 @@ function App() {
     }
 
     setError(null);
+    setHasUserSubmitted(true); // Trigger the wake-up animation on first submission
+
     const newMessage: Message = { role: 'user', content };
 
     // Show user's message instantly
@@ -165,6 +168,7 @@ function App() {
 
     fetchModel1();
     fetchModel2();
+    setHasResponses(true); // Responses are ready
 
     try {
       const [response1, response2] = await Promise.all([
@@ -237,6 +241,7 @@ function App() {
           loading={refereeLoading}
           commentary={refereeCommentary}
           hasResponses={hasResponses}
+          hasUserSubmitted={hasUserSubmitted} // Pass new prop
         />
       </div>
     </div>
