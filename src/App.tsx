@@ -64,29 +64,36 @@ function App() {
   const getGrokCommentary = async (response1: ChatResponse, response2: ChatResponse) => {
     setRefereeLoading(true);
     try {
+      const grokApiKey = import.meta.env.VITE_GROK_API_KEY;
+
+      if (!grokApiKey) {
+        throw new Error('GROK_API_KEY is missing in environment variables');
+      }
+
       const response = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': 'Bearer xai-qrbbhmGEal8VsaL62Si1KuH1tcwJf5MJZmNDPgOedZ8HT9kMIDgGPTsEf4zPUoDeJCTmjhYxuUejMC8q',
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${grokApiKey}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           messages: [
             {
               role: 'system',
-              content: 'You are a trash talking sh*tposter that loves to make fun of llms responses. Take a look at the following 2 chats on the Perplexity Battleground arena that a user is trying to compare. Make a comment about them both and give a ruling on which gave the best response in the most humourous way possible.'
+              content:
+                'You are a trash talking sh*tposter that loves to make fun of llms responses. Take a look at the following 2 chats on the Perplexity Battleground arena that a user is trying to compare. Make a comment about them both and give a ruling on which gave the best response in the most humorous way possible. Keep your full response to about 10 lines if you can.',
             },
             {
               role: 'user',
               content: JSON.stringify({
                 response1: response1.choices[0].message.content,
-                response2: response2.choices[0].message.content
-              })
-            }
+                response2: response2.choices[0].message.content,
+              }),
+            },
           ],
           model: 'grok-beta',
-          temperature: 1
-        })
+          temperature: 1,
+        }),
       });
 
       if (!response.ok) {
@@ -111,30 +118,63 @@ function App() {
 
     setError(null);
     const newMessage: Message = { role: 'user', content };
-    
+
+    // Show user's message instantly
+    setMessages1((prevMessages) => [...prevMessages, newMessage]);
+    setMessages2((prevMessages) => [...prevMessages, newMessage]);
+
+    // Track the start time to calculate response times
+    const startTime = Date.now();
+
+    // Send requests independently
+    const fetchModel1 = async () => {
+      try {
+        const response = await makeRequest(model1, [...messages1, newMessage]);
+        const responseTime = Date.now() - startTime; // Calculate response time
+        setMessages1((prevMessages) => [
+          ...prevMessages,
+          {
+            role: 'assistant',
+            content: response.choices[0].message.content,
+            responseTime,
+          },
+        ]);
+      } catch (error) {
+        console.error('Error fetching response for Model 1:', error);
+        setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      }
+    };
+
+    const fetchModel2 = async () => {
+      try {
+        const response = await makeRequest(model2, [...messages2, newMessage]);
+        const responseTime = Date.now() - startTime; // Calculate response time
+        setMessages2((prevMessages) => [
+          ...prevMessages,
+          {
+            role: 'assistant',
+            content: response.choices[0].message.content,
+            responseTime,
+          },
+        ]);
+      } catch (error) {
+        console.error('Error fetching response for Model 2:', error);
+        setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      }
+    };
+
+    fetchModel1();
+    fetchModel2();
+
     try {
       const [response1, response2] = await Promise.all([
         makeRequest(model1, [...messages1, newMessage]),
         makeRequest(model2, [...messages2, newMessage]),
       ]);
-
-      setMessages1([
-        ...messages1,
-        newMessage,
-        { role: 'assistant', content: response1.choices[0].message.content },
-      ]);
-      setMessages2([
-        ...messages2,
-        newMessage,
-        { role: 'assistant', content: response2.choices[0].message.content },
-      ]);
-
-      setHasResponses(true);
       await getGrokCommentary(response1, response2);
       setIsRefereeOpen(true);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
-      console.error('Error:', error);
+      console.error('Error fetching Grok commentary:', error);
     }
   };
 
@@ -144,7 +184,6 @@ function App() {
         <div className="container mx-auto px-4 py-8">
           <header className="flex items-center justify-between mb-8">
             <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Swords className="w-8 h-8" />
               Perplexity Battleground ⚔️
             </h1>
             <button

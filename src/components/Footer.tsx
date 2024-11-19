@@ -1,5 +1,5 @@
 import React from 'react';
-import { Twitter } from 'lucide-react';
+import { X } from 'lucide-react';
 import { PerplexityIcon } from './PerplexityIcon';
 
 export function Footer() {
@@ -13,7 +13,7 @@ export function Footer() {
           className="flex items-center gap-1 hover:text-gray-900 dark:hover:text-gray-200"
         >
           <PerplexityIcon className="w-4 h-4" />
-          <span>Get Perplexity Pro</span>
+          <span>Get Perplexity Key</span>
         </a>
         <a
           href="https://x.com/lifeonautosite"
@@ -21,7 +21,7 @@ export function Footer() {
           rel="noopener noreferrer"
           className="flex items-center gap-1 hover:text-gray-900 dark:hover:text-gray-200"
         >
-          <Twitter className="w-4 h-4" />
+          <X className="w-4 h-4" />
           <span>@lifeonautosite</span>
         </a>
       </div>

@@ -6,8 +6,9 @@ export interface Model {
 }
 
 export interface Message {
-  role: 'system' | 'user' | 'assistant';
+  role: 'user' | 'assistant';
   content: string;
+  responseTime?: number; // Add this line to allow responseTime
 }
 
 export interface ChatResponse {

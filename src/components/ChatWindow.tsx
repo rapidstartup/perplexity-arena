@@ -29,6 +29,12 @@ export function ChatWindow({ messages, title }: ChatWindowProps) {
               }`}
             >
               <ReactMarkdown>{message.content}</ReactMarkdown>
+              {/* Render response time for assistant messages */}
+              {message.role === 'assistant' && message.responseTime && (
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  Response time: {message.responseTime} ms
+                </p>
+              )}
             </div>
           </div>
         ))}

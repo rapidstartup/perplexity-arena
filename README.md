@@ -1,3 +1,7 @@
 # perplexity-arena
 
-[Edit in StackBlitz next generation editor ⚡️](https://stackblitz.com/~/github.com/rapidstartup/perplexity-arena)
+Made with LOVE from Nathan Shearer :D
+https://x.com/lifeonautosite
+
+Get your Perplexity API key here:
+https://perplexity.ai/pro?referral_code=XA334T47
