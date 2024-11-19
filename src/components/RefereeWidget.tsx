@@ -61,12 +61,13 @@ export function RefereeWidget({
               />
 
               {/* Scrollable commentary section */}
-              <div className="mt-6 bg-red-500 rounded-lg p-4 h-48 overflow-y-auto">
+              <div className="mt-6 bg-red-500 rounded-lg p-4 h-96 overflow-y-auto">
                 {loading ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></div>
                     <div className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                     <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
+                    <div><p className="text-sm whitespace-pre-wrap">..waiting on Perplexity</p></div>
                   </div>
                 ) : (
                   <p className="text-sm whitespace-pre-wrap">{commentary}</p>

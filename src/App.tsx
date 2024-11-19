@@ -20,37 +20,68 @@ function App() {
   const [refereeLoading, setRefereeLoading] = useState(false);
   const [refereeCommentary, setRefereeCommentary] = useState<string>();
   const [hasResponses, setHasResponses] = useState(false);
-  const [hasUserSubmitted, setHasUserSubmitted] = useState(false); // Track first user submission
+  const [hasUserSubmitted, setHasUserSubmitted] = useState(false);
+  const [inputDisabled, setInputDisabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [remainingFreeUsage, setRemainingFreeUsage] = useState(1);
+
+  const selectedModel = MODELS.find((model) => model.Model === model1);
+
+  // Default API key from environment
+  const builtInApiKey = import.meta.env.VITE_PERPLEXITY_API_KEY;
 
   useEffect(() => {
+    // Load API key and remaining free usage from localStorage
     const savedKey = localStorage.getItem('perplexity_api_key');
+    const freeUsage = parseInt(localStorage.getItem('remaining_free_usage') || '1', 10);
+
     if (savedKey) {
       setApiKey(savedKey);
+    } else if (freeUsage > 0) {
+      setRemainingFreeUsage(freeUsage);
     }
   }, []);
 
+  useEffect(() => {
+    // Save remaining free usage to localStorage
+    localStorage.setItem('remaining_free_usage', remainingFreeUsage.toString());
+  }, [remainingFreeUsage]);
+
   const makeRequest = async (model: string, messages: Message[]): Promise<ChatResponse> => {
+    if (!apiKey && remainingFreeUsage <= 0) {
+      throw new Error('You have used the free trial. Please provide your own API key.');
+    }
+
+    const keyToUse = apiKey || builtInApiKey;
+    if (!keyToUse) {
+      throw new Error('Missing API key.');
+    }
+
     try {
       const response = await fetch('https://api.perplexity.ai/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${keyToUse}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           model,
-          messages: messages.map(msg => ({
+          messages: messages.map((msg) => ({
             role: msg.role,
-            content: msg.content
+            content: msg.content,
           })),
-          temperature: 0.7
-        })
+          temperature: 0.7,
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
         throw new Error(errorData?.error?.message || `API request failed with status ${response.status}`);
+      }
+
+      // Decrement remaining free usage if built-in API key is used
+      if (!apiKey) {
+        setRemainingFreeUsage((prev) => prev - 1);
       }
 
       return response.json();
@@ -82,7 +113,7 @@ function App() {
             {
               role: 'system',
               content:
-                'You are a trash talking sh*tposter that loves to make fun of llms responses. Take a look at the following 2 chats on the Perplexity Battleground arena that a user is trying to compare. Make a comment about them both and give a ruling on which gave the best response in the most humorous way possible. Keep your full response to about 10 lines if you can.',
+                'You are a trash talking sh*tposter that loves to make fun of llms responses. Take a look at the following 2 chats on the Perplexity Battleground arena that a user is trying to compare. Make a comment about them both and give a ruling on which gave the best response in the most humorous way possible. You will also see the RESPONSE TIME given, so you can comment on that too. Keep your full response to about 10-20 lines if you can.',
             },
             {
               role: 'user',
@@ -112,8 +143,8 @@ function App() {
   };
 
   const handleSendMessage = async (content: string) => {
-    if (!apiKey || !model1 || !model2) {
-      setError('Please set API key and select both models');
+    if ((!apiKey && remainingFreeUsage <= 0) || !model1 || !model2) {
+      setError('You must provide an API key after your free usage is exhausted.');
       return;
     }
 
@@ -125,6 +156,8 @@ function App() {
     // Show user's message instantly
     setMessages1((prevMessages) => [...prevMessages, newMessage]);
     setMessages2((prevMessages) => [...prevMessages, newMessage]);
+
+    setInputDisabled(true); // Disable ChatInput while waiting for responses
 
     // Track the start time to calculate response times
     const startTime = Date.now();
@@ -166,8 +199,8 @@ function App() {
       }
     };
 
-    fetchModel1();
-    fetchModel2();
+    await Promise.all([fetchModel1(), fetchModel2()]);
+    setInputDisabled(false); // Re-enable ChatInput when responses are complete
     setHasResponses(true); // Responses are ready
 
     try {
@@ -204,6 +237,12 @@ function App() {
             </div>
           )}
 
+          {!apiKey && remainingFreeUsage <= 0 && (
+            <div className="mb-4 p-4 bg-yellow-100 dark:bg-yellow-800 text-yellow-700 dark:text-yellow-100 rounded-lg">
+              You have used your free trial. Please add your own Perplexity API key to continue.
+            </div>
+          )}
+
           <div className="mb-8">
             <ApiKeyInput onSave={setApiKey} />
           </div>
@@ -230,7 +269,11 @@ function App() {
             <ChatWindow messages={messages2} title={model2 || 'Model 2'} />
           </div>
 
-          <ChatInput onSend={handleSendMessage} />
+          <ChatInput
+            onSend={handleSendMessage}
+            tools={selectedModel?.Tools || ''}
+            disabled={inputDisabled || (!apiKey && remainingFreeUsage <= 0)} // Disable input if necessary
+          />
 
           <Footer />
         </div>
@@ -241,7 +284,7 @@ function App() {
           loading={refereeLoading}
           commentary={refereeCommentary}
           hasResponses={hasResponses}
-          hasUserSubmitted={hasUserSubmitted} // Pass new prop
+          hasUserSubmitted={hasUserSubmitted}
         />
       </div>
     </div>

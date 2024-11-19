@@ -3,6 +3,7 @@ export interface Model {
   'Parameter Count': string;
   'Context Length': number;
   'Model Type': string;
+  'Tools': string;
 }
 
 export interface Message {
